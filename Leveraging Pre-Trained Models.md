@@ -257,13 +257,13 @@ Now that we have a few pre-trained models downloaded, it's time to preprocess th
 
 As a reminder, our three models are:
 
-Human Pose Estimation: human-pose-estimation-0001
-Text Detection: text-detection-0004
-Determining Car Type & Color: vehicle-attributes-recognition-barrier-0039
+Human Pose Estimation: [human-pose-estimation-0001](https://docs.openvinotoolkit.org/latest/_models_intel_human_pose_estimation_0001_description_human_pose_estimation_0001.html)
+Text Detection: [text-detection-0004](http://docs.openvinotoolkit.org/latest/_models_intel_text_detection_0004_description_text_detection_0004.html)
+Determining Car Type & Color: [vehicle-attributes-recognition-barrier-0039](https://docs.openvinotoolkit.org/latest/_models_intel_vehicle_attributes_recognition_barrier_0039_description_vehicle_attributes_recognition_barrier_0039.html)
 Note: For ease of use, these models have been added into the /home/workspace/models directory. For example, if you need to use the Text Detection model, you could find it at:
 
-
 /home/workspace/models/text_detection_0004.xml
+
 Each link above contains the documentation for the related model. In our case, we want to focus on the Inputs section of the page, wherein important information regarding the input shape, order of the shape (such as color channel first or last), and the order of the color channels, is included.
 
 Your task is to fill out the code in three functions within preprocess_inputs.py, one for each of the three models. We have also included a potential sample image for each of the three models, that will be used with test.py to check whether the input for each model has been adjusted as expected for proper model input.
@@ -272,3 +272,105 @@ Note that each image is currently loaded as BGR with H, W, C order in the test.p
 
 When finished, you should be able to run the test.py file and pass all three tests.
 
+
+
+## Preprocessing Inputs - Solution ###
+
+### Pose Estimation ###
+
+Let's start with `pose_estimation`, and it's [related documentation](https://docs.openvinotoolkit.org/latest/_models_intel_human_pose_estimation_0001_description_human_pose_estimation_0001.html).
+
+I see it is in [B, C, H, W] format, with a shape of 1x3x256x456, and an expected color order
+of BGR.
+
+Since we're loading the image with OpenCV, I know it's already in BGR format. From there, 
+I need to resize the image to the desired shape, but that's going to get me 256x256x3.
+
+```
+preprocessed_image = cv2.resize(preprocessed_image, (256, 456))
+```
+
+So, I need to transpose the image, where the 3rd dimension, containing the channels,
+is placed first, with the other two following.
+
+```
+preprocessed_image = preprocessed_image.transpose((2,0,1))
+```
+
+Lastly, I still need to add the `1` for the batch size at the start. I can actually just reshape
+to "add" the extra dimension.
+
+```
+preprocessed_image = preprocessed_image.reshape(1,3,256,456)
+```
+
+### Text Detection
+
+Next, let's look at `text_detection`, and it's [related documentation](http://docs.openvinotoolkit.org/latest/_models_intel_text_detection_0004_description_text_detection_0004.html).
+
+This will actually be a very similar process to above! As such, you might actually consider
+whether you could add a standard "helper" for each of these, where you could just add the
+desired input shape, and perform the same transformations. Note that it does require knowing
+for sure that all the steps (being in BGR, resizing, transposing, reshaping) are needed for each.
+
+Here, the only change needed is for resizing (as well as the dimensions fed into reshape):
+
+```
+cv2.resize(preprocessed_image, (768, 1280))
+```
+
+### Car Metadata
+
+Lastly, let's cover `car_meta`, and it's [related documentation](https://docs.openvinotoolkit.org/latest/_models_intel_vehicle_attributes_recognition_barrier_0039_description_vehicle_attributes_recognition_barrier_0039.html).
+
+Again, all we need to change is how the image is resized, and making sure we `reshape` 
+correctly:
+
+```
+cv2.resize(preprocessed_image, (72, 72))
+```
+Run with python test.py
+
+## Solution ##
+
+Using the documentation pages for each model, I ended up noticing they needed essentially the same preprocessing, outside of the height and width of the input to the network. The images coming from cv2.imread were already going to be BGR, and all the models wanted BGR inputs, so I didn't need to do anything there. However, each image was coming in as height x width x channels, and each of these networks wanted channels first, along with an extra dimension at the start for batch size.
+
+So, for each network, the preprocessing needed to 1) re-size the image, 2) move the channels from last to first, and 3) add an extra dimension of 1 to the start. Here is the function I created for this, which I could call for each separate network:
+
+def preprocessing(input_image, height, width):
+    '''
+    Given an input image, height and width:
+    - Resize to height and width
+    - Transpose the final "channel" dimension to be first
+    - Reshape the image to add a "batch" of 1 at the start 
+    '''
+    image = cv2.resize(input_image, (width, height))
+    image = image.transpose((2,0,1))
+    image = image.reshape(1, 3, height, width)
+
+    return image
+Then, for each model, I can just call this function with the height and width from the documentation:
+
+Human Pose
+preprocessed_image = preprocessing(preprocessed_image, 256, 456)
+Text Detection
+preprocessed_image = preprocessing(preprocessed_image, 768, 1280)
+Car Meta
+preprocessed_image = preprocessing(preprocessed_image, 72, 72)
+Testing
+To test your implementation, you can just run python test.py.
+
+## Handling Network Outputs ##
+
+Like the computer vision model types we discussed earlier, we covered the primary outputs those networks create: classes, bounding boxes, and semantic labels.
+
+Classification networks typically output an array with the softmax probabilities by class; the argmax of those probabilities can be matched up to an array by class for the prediction.
+
+Bounding boxes typically come out with multiple bounding box detections per image, which each box first having a class and confidence. Low confidence detections can be ignored. From there, there are also an additional four values, two of which are an X, Y pair, while the other may be the opposite corner pair of the bounding box, or otherwise a height and width.
+
+Semantic labels give the class for each pixel. Sometimes, these are flattened in the output, or a different size than the original image, and need to be reshaped or resized to map directly back to the input.
+
+Quiz Information
+In a network like SSD that we discussed earlier, the output is a series of bounding boxes for potential object detections, typically also including a confidence threshold, or how confident the model is about that particular detection.
+
+Therefore, inference performed on a given image will output an array with multiple bounding box predictions including: the class of the object, the confidence, and two corners (made of xmin, ymin, xmax, and ymax) that make up the bounding box, in that order.
