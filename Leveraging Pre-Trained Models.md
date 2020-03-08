@@ -371,6 +371,183 @@ Bounding boxes typically come out with multiple bounding box detections per imag
 Semantic labels give the class for each pixel. Sometimes, these are flattened in the output, or a different size than the original image, and need to be reshaped or resized to map directly back to the input.
 
 Quiz Information
-In a network like SSD that we discussed earlier, the output is a series of bounding boxes for potential object detections, typically also including a confidence threshold, or how confident the model is about that particular detection.
+In a network like [SSD](https://arxiv.org/pdf/1512.02325.pdf) that we discussed earlier, the output is a series of bounding boxes for potential object detections, typically also including a confidence threshold, or how confident the model is about that particular detection.
 
 Therefore, inference performed on a given image will output an array with multiple bounding box predictions including: the class of the object, the confidence, and two corners (made of xmin, ymin, xmax, and ymax) that make up the bounding box, in that order.
+
+Further Research
+[Here](https://towardsdatascience.com/understanding-ssd-multibox-real-time-object-detection-in-deep-learning-495ef744fab) is a great write-up on working with SSD and its output
+This [post](https://thegradient.pub/semantic-segmentation/) gets into more of the differences in moving from models with bounding boxes to those using semantic segmentation
+
+## Running Your First Edge App ##
+
+![inference2](Inference_Engine_02.jpg)
+You have now learned the key parts of working with a pre-trained model: obtaining the model, preprocessing inputs for it, and handling its output. In the upcoming exercise, you’ll load a pre-trained model into the Inference Engine, as well as call for functions to preprocess and handle the output in the appropriate locations, from within an edge app. We’ll still be abstracting away some of the steps of dealing with the Inference Engine API until a later lesson, but these should work similarly across different models.
+
+
+## Solution: Deploy an App at the Edge ##
+This was a tough one! It takes a little bit to step through this solution, as I want to give you some of my own techniques to approach this rather difficult problem first. The solution video is split into three parts - the first focuses on adding in the preprocessing and output handling calls within the app itself, and then into how I would approach implementing the Car Meta model's output handling.
+
+### Early Steps and Car Meta Model Output Handling ###
+
+The code for calling preprocessing and utilizing the output handling functions from within app.py is fairly straightforward:
+
+```python
+preprocessed_image = preprocessing(image, h, w)
+```
+
+
+Lesson 2:
+Leveraging Pre-Trained Models
+ 1. Introduction
+ 2. The OpenVINO™ Toolkit
+ 3. Pre-Trained Models in OpenVINO™
+ 4. Types of Computer Vision Models
+ 5. Case Studies in Computer Vision
+ 6. Available Pre-Trained Models in OpenVINO™
+ 7. Exercise: Loading Pre-Trained Models
+ 8. Solution: Loading Pre-Trained Models
+ 9. Optimizations on the Pre-Trained Models
+ 10. Choosing the Right Model for Your App
+ 11. Pre-processing Inputs
+ 12. Exercise: Pre-processing Inputs
+ 13. Solution: Pre-processing Inputs
+ 14. Handling Network Outputs
+ 15. Running Your First Edge App
+ 16. Exercise: Deploy An App at the Edge
+ 17. Solution: Deploy An App at the Edge
+ 18. Recap
+ 19. Lesson Glossary
+Student Hub
+Chat with peers and mentors
+Toggle Sidebar
+Solution: Deploy An App at the Edge
+Solution: Deploy an App at the Edge
+This was a tough one! It takes a little bit to step through this solution, as I want to give you some of my own techniques to approach this rather difficult problem first. The solution video is split into three parts - the first focuses on adding in the preprocessing and output handling calls within the app itself, and then into how I would approach implementing the Car Meta model's output handling.
+
+Early Steps and Car Meta Model Output Handling
+
+The code for calling preprocessing and utilizing the output handling functions from within app.py is fairly straightforward:
+
+preprocessed_image = preprocessing(image, h, w)
+This is just feeding in the input image, along with height and width of the network, which the given inference_network.load_model function actually returned for you.
+
+output_func = handle_output(args.t)
+processed_output = output_func(output, image.shape)
+This is partly based on the helper function I gave you, which can return the correct output handling function by feeding in the model type. The second line actually sends the output of inference and image shape to whichever output handling function is appropriate.
+
+Car Meta Output Handling
+Given that the two outputs for the Car Meta Model are "type" and "color", and are just the softmax probabilities by class, I wanted you to just return the np.argmax, or the index where the highest probability was determined.
+
+def handle_car(output, input_shape):
+    '''
+    Handles the output of the Car Metadata model.
+    Returns two integers: the argmax of each softmax output.
+    The first is for color, and the second for type.
+    '''
+    # Get rid of unnecessary dimensions
+    color = output['color'].flatten()
+    car_type = output['type'].flatten()
+    # TODO 1: Get the argmax of the "color" output
+    color_pred = np.argmax(color)
+    # TODO 2: Get the argmax of the "type" output
+    type_pred = np.argmax(car_type)
+
+    return color_pred, type_pred
+Run the Car Meta Model
+I have moved the models used in the exercise into a models subdirectory in the /home/workspace directory, so the path used can be a little bit shorter.
+
+python app.py -i "images/blue-car.jpg" -t "CAR_META" -m "/home/workspace/models/vehicle-attributes-recognition-barrier-0039.xml" -c "/opt/intel/openvino/deployment_tools/inference_engine/lib/intel64/libcpu_extension_sse4.so"
+For the other models, make sure to update the input image -i, model type -t, and model -m accordingly.
+
+Pose Estimation Output Handling
+Handling the car output was fairly straightforward by using np.argmax, but the outputs for the pose estimation and text detection models is a bit trickier. However, there's a lot of similar code between the two. In this second part of the solution, I'll go into detail on the pose estimation model, and then we'll finish with a quick video on handling the output of the text detection model.
+
+
+Pose Estimation is more difficult, and doesn't have as nicely named outputs. I noted you just need the second one in this exercise, called 'Mconv7_stage2_L2', which is just the keypoint heatmaps, and not the associations between these keypoints. From there, I created an empty array to hold the output heatmaps once they are re-sized, as I decided to iterate through each heatmap 1 by 1 and re-size it, which can't be done in place on the original output.
+
+def handle_pose(output, input_shape):
+    '''
+    Handles the output of the Pose Estimation model.
+    Returns ONLY the keypoint heatmaps, and not the Part Affinity Fields.
+    '''
+    # TODO 1: Extract only the second blob output (keypoint heatmaps)
+    heatmaps = output['Mconv7_stage2_L2']
+    # TODO 2: Resize the heatmap back to the size of the input
+    # Create an empty array to handle the output map
+    out_heatmap = np.zeros([heatmaps.shape[1], input_shape[0], input_shape[1]])
+    # Iterate through and re-size each heatmap
+    for h in range(len(heatmaps[0])):
+        out_heatmap[h] = cv2.resize(heatmaps[0][h], input_shape[0:2][::-1])
+
+    return out_heatmap
+Note that the input_shape[0:2][::-1] line is taking the original image shape of HxWxC, taking just the first two (HxW), and reversing them to be WxH as cv2.resize uses.
+
+Text Detection Model Handling
+Thanks for sticking in there! The code for the text detection model is pretty similar to the pose estimation one, so let's finish things off.
+
+
+Text Detection had a very similar output processing function, just using the 'model/segm_logits/add' output and only needing to resize over two "channels" of output. I likely could have extracted this out into its own output handling function that both Pose Estimation and Text Detection could have used.
+
+def handle_text(output, input_shape):
+    '''
+    Handles the output of the Text Detection model.
+    Returns ONLY the text/no text classification of each pixel,
+        and not the linkage between pixels and their neighbors.
+    '''
+    # TODO 1: Extract only the first blob output (text/no text classification)
+    text_classes = output['model/segm_logits/add']
+    # TODO 2: Resize this output back to the size of the input
+    out_text = np.empty([text_classes.shape[1], input_shape[0], input_shape[1]])
+    for t in range(len(text_classes[0])):
+        out_text[t] = cv2.resize(text_classes[0][t], input_shape[0:2][::-1])
+
+    return out_text
+
+
+    Edge Application
+Applications with inference run on local hardware, sometimes without network connections, such as Internet of Things (IoT) devices, as opposed to the cloud. Less data needs to be streamed over a network connection, and real-time decisions can be made.
+
+OpenVINO™ Toolkit
+The Intel® Distribution of OpenVINO™ Toolkit enables deep learning inference at the edge by including both neural network optimizations for inference as well as hardware-based optimizations for Intel® hardware.
+
+Pre-Trained Model
+Computer Vision and/or AI models that are already trained on large datasets and available for use in your own applications. These models are often trained on datasets like ImageNet. Pre-trained models can either be used as is or used in transfer learning to further fine-tune a model. The OpenVINO™ Toolkit provides a number of pre-trained models that are already optimized for inference.
+
+Transfer Learning
+The use of a pre-trained model as a basis for further training of a neural network. Using a pre-trained model can help speed up training as the early layers of the network have feature extractors that work in a wide variety of applications, and often only late layers will need further fine-tuning for your own dataset. OpenVINO™ does not deal with transfer learning, as all training should occur prior to using the Model Optimizer.
+
+Image Classification
+A form of inference in which an object in an image is determined to be of a particular class, such as a cat vs. a dog.
+
+Object Detection
+A form of inference in which objects within an image are detected, and a bounding box is output based on where in the image the object was detected. Usually, this is combined with some form of classification to also output which class the detected object belongs to.
+
+Semantic Segmentation
+A form of inference in which objects within an image are detected and classified on a pixel-by-pixel basis, with all objects of a given class given the same label.
+
+Instance Segmentation
+Similar to semantic segmentation, this form of inference is done on a pixel-by-pixel basis, but different objects of the same class are separately identified.
+
+SSD
+A neural network combining object detection and classification, with different feature extraction layers directly feeding to the detection layer, using default bounding box sizes and shapes/
+
+YOLO
+One of the original neural networks to only take a single look at an input image, whereas earlier networks ran a classifier multiple times across a single image at different locations and scales.
+
+Faster R-CNN
+A network, expanding on R-CNN and Fast R-CNN, that integrates advances made in the earlier models by adding a Region Proposal Network on top of the Fast R-CNN model for an integrated object detection model.
+
+MobileNet
+A neural network architecture optimized for speed and size with minimal loss of inference accuracy through the use of techniques like 1x1 convolutions. As such, MobileNet is more useful in mobile applications that substantially larger and slower networks.
+
+ResNet
+A very deep neural network that made use of residual, or “skip” layers that pass information forward by a couple of layers. This helped deal with the vanishing gradient problem experienced by deeper neural networks.
+
+Inception
+A neural network making use of multiple different convolutions at each “layer” of the network, such as 1x1, 3x3 and 5x5 convolutions. The top architecture from the original paper is also known as GoogLeNet, an homage to LeNet, an early neural network used for character recognition.
+
+Inference Precision
+Precision refers to the level of detail to weights and biases in a neural network, whether in floating point precision or integer precision. Lower precision leads to lower accuracy, but with a positive trade-off for network speed and size.
+
+
