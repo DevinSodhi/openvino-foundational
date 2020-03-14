@@ -285,3 +285,383 @@ MQTT is one example of this type of architecture, and is very lightweight. While
 Further Research
 Visit the [main site](http://mqtt.org/) for MQTT
 A [helpful post]([0](https://internetofthingsagenda.techtarget.com/definition/MQTT-MQ-Telemetry-Transport)) on more of the basics of MQTT
+
+## Communicating with MQTT
+here is a useful Python library for working with MQTT called paho-mqtt. Within, there is a sub-library called client, which is how you create an MQTT client that can publish or subscribe to the broker.
+
+To do so, you’ll need to know the IP address of the broker, as well as the port for it. With those, you can connect the client, and then begin to either publish or subscribe to topics.
+
+Publishing involves feeding in the topic name, as well as a dictionary containing a message that is dumped to JSON. Subscribing just involves feeding in the topic name to be subscribed to.
+
+You’ll need the [documentation](https://pypi.org/project/paho-mqtt/) for paho-mqtt to answer the quiz below.
+
+QUIZ QUESTION
+Match the code snippets below to whether they are being used for publishing or subscribing to a ”students” topic (given a MQTT client and some data).
+
+COMMUNICATION FORM
+
+CODE
+
+Publish
+client.publish("students", data)
+Subscribe
+client.subscribe("students")
+
+Further Research
+As usual, documentation is your friend. Make sure to check out the [documentation on PyPi](https://pypi.org/project/paho-mqtt/) related to the paho-mqtt Python library if you want to learn more about its functionality.
+Intel® has a [pretty neat IoT tutorial](https://software.intel.com/en-us/SetupGateway-MQTT) on working with MQTT with Python you can check out as well.
+
+## Streaming Images to a server
+Sometimes, you may still want a video feed to be streamed to a server. A security camera that detects a person where they shouldn’t be and sends an alert is useful, but you likely want to then view the footage. Since MQTT can’t handle images, we have to look elsewhere.
+
+At the start of the course, we noted that network communications can be expensive in cost, bandwidth and power consumption. Video streaming consumes a ton of network resources, as it requires a lot of data to be sent over the network, clogging everything up. Even with high-speed internet, multiple users streaming video can cause things to slow down. As such, it’s important to first consider whether you even need to stream video to a server, or at least only stream it in certain situations, such as when your edge AI algorithm has detected a particular event.
+
+FFmpeg
+Of course, there are certainly situations where streaming video is necessary. The FFmpeg library is one way to do this. The name comes from “fast forward” MPEG, meaning it’s supposed to be a fast way of handling the MPEG video standard (among others).
+
+In our case, we’ll use the ffserver feature of FFmpeg, which, similar to MQTT, will actually have an intermediate FFmpeg server that video frames are sent to. The final Node server that displays a webpage will actually get the video from that FFmpeg server.
+
+There are other ways to handle streaming video as well. In Python, you can also use a flask server to do some similar things, although we’ll focus on FFmpeg here.
+
+Setting up FFmpeg
+You can download FFmpeg from ffmpeg.org. Using ffserver in particular requires a configuration file that we will provide for you. This config file sets the port and IP address of the server, as well as settings like the ports to receive video from, and the framerate of the video. These settings can also allow it to listen to the system stdout buffer, which is how you can send video frames to it in Python.
+
+Sending frames to FFmpeg
+With the sys Python library, can use sys.stdout.buffer.write(frame) and sys.stdout.flush() to send the frame to the ffserver when it is running.
+
+If you have a ffmpeg folder containing the configuration file for the server, you can launch the ffserver with the following from the command line:
+
+sudo ffserver -f ./ffmpeg/server.conf
+From there, you need to actually pipe the information from the Python script to FFmpeg. To do so, you add the | symbol after the python script (as well as being after any related arguments to that script, such as the model file or CPU extension), followed by ffmpeg and any of its related arguments.
+
+For example:
+
+python app.py -m “model.xml” | ffmpeg -framerate 24
+And so on with additional arguments before or after the pipe symbol depending on whether they are for the Python application or for FFmpeg.
+
+
+Streaming Images to a Server Quiz
+Given additional network impacts of streaming full video, why might it still be useful to be streaming video back to another server, given AI applied at the edge?
+
+Your reflection
+alerts that require network response, large storage for the video data (given that its not required right away). One usecase is with my Dash Cam, which takes snippets of videos and sends them to the server only when an "event" happens. The recognition of important events is done at the edge.
+Things to think about
+Thanks for your response! Think of a security camera - it’s great it identified there is a potential break-in, and now I probably want to see the footage of that camera.
+
+Further Research
+We covered [FFMPEG](https://www.ffmpeg.org/) and ffserver, but as you may guess, there are also other ways to stream video to a browser. Here are a couple other options you can investigate for your own use:
+
+[Set up Your Own Server on Linux](https://opensource.com/article/19/1/basic-live-video-streaming-server)
+[Use Flask and Python](https://www.pyimagesearch.com/2019/09/02/opencv-stream-video-to-web-browser-html-page/)
+
+## Handling Statistics and Images from a Node Server
+
+[Node.js](https://nodejs.org/en/about/) is an open-source environment for servers, where Javascript can be run outside of a browser. Consider a social media page, for instance - that page is going to contain different content for each different user, based on their social network. Node allows for Javascript to run outside of the browser to gather the various relevant posts for each given user, and then send those posts to the browser.
+
+In our case, a Node server can be used to handle the data coming in from the MQTT and FFmpeg servers, and then actually render that content for a web page user interface.
+
+More on Front-End
+Check out the [Front End Developer Nanodegree](https://www.udacity.com/course/front-end-web-developer-nanodegree--nd0011) program if you want to learn more of these skills!
+
+## Exercise Server Communications
+
+### Server Communications
+
+Make sure to click the button below before you get started to source the correct environment.
+
+<button id="ulab-button-66f8bc80" class="ulab-btn--primary"></button>
+
+In this exercise, you will practice showing off your new server communication skills
+for sending statistics over MQTT and images with FFMPEG.
+
+The application itself is already built and able to perform inference, and a node server is set
+up for you to use. The main node server is already fully ready to receive communications from
+MQTT and FFMPEG. The MQTT node server is fully configured as well. Lastly, the ffserver is 
+already configured for FFMPEG too.
+
+The current application simply performs inference on a frame, gathers some statistics, and then 
+continues onward to the next frame. 
+
+### Tasks
+
+Your tasks are to:
+
+- Add any code for MQTT to the project so that the node server receives the calculated stats
+  - This includes importing the relevant Python library
+  - Setting IP address and port
+  - Connecting to the MQTT client
+  - Publishing the calculated statistics to the client
+- Send the output frame (**not** the input image, but the processed output) to the ffserver
+
+### Additional Information
+
+Note: Since you are given the MQTT Broker Server and Node Server for the UI, you need 
+certain information to correctly configure, publish and subscribe with MQTT.
+- The MQTT port to use is 3001 - the classroom workspace only allows ports 3000-3009
+- The topics that the UI Node Server is listening to are "class" and "speedometer"
+- The Node Server will attempt to extract information from any JSON received from the MQTT server with the keys "class_names" and "speed"
+
+### Running the App
+
+First, get the MQTT broker and UI installed.
+
+- `cd webservice/server`
+- `npm install`
+- When complete, `cd ../ui`
+- And again, `npm install`
+
+You will need *four* separate terminal windows open in order to see the results. The steps
+below should be done in a different terminal based on number. You can open a new terminal
+in the workspace in the upper left (File>>New>>Terminal).
+
+1. Get the MQTT broker installed and running.
+  - `cd webservice/server/node-server`
+  - `node ./server.js`
+  - You should see a message that `Mosca server started.`.
+2. Get the UI Node Server running.
+  - `cd webservice/ui`
+  - `npm run dev`
+  - After a few seconds, you should see `webpack: Compiled successfully.`
+3. Start the ffserver
+  - `sudo ffserver -f ./ffmpeg/server.conf`
+4. Start the actual application. 
+  - First, you need to source the environment for OpenVINO *in the new terminal*:
+    - `source /opt/intel/openvino/bin/setupvars.sh -pyver 3.5`
+  - To run the app, I'll give you two items to pipe in with `ffmpeg` here, with the rest up to you:
+    - `-video_size 1280x720`
+    - `-i - http://0.0.0.0:3004/fac.ffm`
+
+Your app should begin running, and you should also see the MQTT broker server noting
+information getting published.
+
+In order to view the output, click on the "Open App" button below in the workspace.
+
+### solution : 
+
+
+```
+import sys
+```
+
+This is used as the `ffserver` can be configured to read from `sys.stdout`. Once the output
+frame has been processed (drawing bounding boxes, semantic masks, etc.), you can write
+the frame to the `stdout` buffer and `flush` it.
+
+```
+sys.stdout.buffer.write(frame)  
+sys.stdout.flush()
+```
+
+And that's it! As long as the MQTT and FFmpeg servers are running and configured
+appropriately, the information should be able to be received by the final node server, 
+and viewed in the browser.
+
+To run the app itself, with the UI server, MQTT server, and FFmpeg server also running, do:
+
+```
+python app.py | ffmpeg -v warning -f rawvideo -pixel_format bgr24 -video_size 1280x720 -framerate 24 -i - http://0.0.0.0:3004/fac.ffm
+```
+
+This will feed the output of the app to FFmpeg.
+
+
+### readme
+
+# Server Communications - Solution
+
+Let's focus on MQTT first, and then FFmpeg.
+
+### MQTT
+
+First, I import the MQTT Python library. I use an alias here so the library is easier to work with.
+
+```
+import paho.mqtt.client as mqtt
+```
+
+I also need to `import socket` so I can connect to the MQTT server. Then, I can get the 
+IP address and set the port for communicating with the MQTT server.
+
+```
+HOSTNAME = socket.gethostname()
+IPADDRESS = socket.gethostbyname(HOSTNAME)
+MQTT_HOST = IPADDRESS
+MQTT_PORT = 3001
+MQTT_KEEPALIVE_INTERVAL = 60
+```
+
+This will set the IP address and port, as well as the keep alive interval. The keep alive interval
+is used so that the server and client will communicate every 60 seconds to confirm their
+connection is still open, if no other communication (such as the inference statistics) is received.
+
+Connecting to the client can be accomplished with:
+
+```
+client = mqtt.Client()
+client.connect(MQTT_HOST, MQTT_PORT, MQTT_KEEPALIVE_INTERVAL)
+```
+
+Note that `mqtt` in the above was my import alias - if you used something different, that line
+will also differ slightly, although will still use `Client()`.
+
+The final piece for MQTT is to actually publish the statistics to the connected client.
+
+```
+topic = "some_string"
+client.publish(topic, json.dumps({"stat_name": statistic}))
+```
+
+The topic here should match to the relevant topic that is being subscribed to from the other
+end, while the JSON being published should include the relevant name of the statistic for
+the node server to parse (with the name like the key of a dictionary), with the statistic passed
+in with it (like the items of a dictionary).
+
+```
+client.publish("class", json.dumps({"class_names": class_names}))
+client.publish("speedometer", json.dumps({"speed": speed}))
+```
+
+And, at the end of processing the input stream, make sure to disconnect.
+
+```
+client.disconnect()
+```
+
+### FFmpeg
+
+FFmpeg does not actually have any real specific imports, although we do want the standard
+`sys` library
+
+```
+import sys
+```
+
+This is used as the `ffserver` can be configured to read from `sys.stdout`. Once the output
+frame has been processed (drawing bounding boxes, semantic masks, etc.), you can write
+the frame to the `stdout` buffer and `flush` it.
+
+```
+sys.stdout.buffer.write(frame)  
+sys.stdout.flush()
+```
+
+And that's it! As long as the MQTT and FFmpeg servers are running and configured
+appropriately, the information should be able to be received by the final node server, 
+and viewed in the browser.
+
+To run the app itself, with the UI server, MQTT server, and FFmpeg server also running, do:
+
+```
+python app.py | ffmpeg -v warning -f rawvideo -pixel_format bgr24 -video_size 1280x720 -framerate 24 -i - http://0.0.0.0:3004/fac.ffm
+```
+
+This will feed the output of the app to FFmpeg.
+
+
+## Analyzing Performance Basics
+
+We’ve talked a lot about optimizing for inference and running apps at the edge, but it’s important not to skip past the accuracy of your edge AI model. Lighter, quicker models are helpful for the edge, and certain optimizations like lower precision that help with these will have some impact on accuracy, as we discussed earlier on.
+
+No amount of skillful post-processing and attempting to extract useful data from the output will make up for a poor model choice, or one where too many sacrifices were made for speed.
+
+Of course, it all depends on the exact application as to how much loss of accuracy is acceptable. Detecting a pet getting into the trash likely can handle less accuracy than a self-driving car in determining where objects are on the road.
+
+The considerations of speed, size and network impacts are still very important for AI at the Edge. Faster models can free up computation for other tasks, lead to less power usage, or allow for use of cheaper hardware. Smaller models can also free up memory for other tasks, or allow for devices with less memory to begin with. We’ve also discussed some of the network impacts earlier. Especially for remote edge devices, the power costs of heavy network communication may significantly hamper their use,
+
+Lastly, there can be other differences in cloud vs edge costs other than just network effects. While potentially lower up front, cloud storage and computation costs can add up over time. Data sent to the cloud could be intercepted along the way. Whether this is better or not at the edge does depend on a secure edge device, which isn’t always the case for IoT.
+
+QUIZ QUESTION
+Which of the following are the most likely performance improvements experienced when deploying with OpenVINO™ and deploying at the edge?
+
+
+
+Less impact on the network
+
+Faster inference
+
+Smaller model size
+
+
+
+Further Research
+We'll cover more on performance with the Intel® Distribution of OpenVINO™ Toolkit in later courses, but you can check out the [developer docs](https://docs.openvinotoolkit.org/2019_R3/_docs_IE_DG_Intro_to_Performance.html) here for a preview.
+Did you know [Netflix uses 15% of worldwide bandwidth](https://www.sandvine.com/hubfs/downloads/phenomena/phenomena-presentation-final.pdf) with its video streaming? Cutting down on streaming your video to the cloud vs. performing work at the edge can vastly cut down on network costs.
+
+
+## model use case
+
+It’s important to think about any additional use cases for a given model or application you build, which can reach far beyond the original training set or intended use. For example, object detection can be used for so many things, and focusing on certain classes along with some post-processing can lead to very different applications.
+
+Model Use Cases Quiz
+What are some use cases you can think of for a model that detects where the attention of someone on camera is directed at?
+
+Your reflection
+Dash cam, car alert system for smart cars, girlfriend warning system =p
+Things to think about
+Thanks for your response! One use case I thought of was in detecting [distracted drivers](https://www.nauto.com/blog/nauto-engineering-deep-learning-for-distracted-driver-monitoring).
+
+## Concerning End User Needs
+
+
+If you are building an app for certain end users, it’s very important to consider their needs. Knowing their needs can inform the various trade-offs you make regarding model decisions (speed, size, accuracy, etc.), what information to send to servers, security of information, etc. If they have more resources available, you might go for a higher accuracy but more resource-intensive app, while an end user with remote, low-power devices will likely have to sacrifice some accuracy for a lighter, faster app, and need some additional considerations about network usage.
+
+This is just to get you thinking - building edge applications is about more than just models and code.
+
+Concerning End User Needs Quiz
+How would you explain to an end user the potential trade-offs made when optimizing for different models and implementations, such as speed, memory size, and network impacts?
+
+Your reflection
+usually you have to explain trade offs while suggesting systems that work for their use case. Edge can be cheaper especially if you consider long term compute costs, but cloud has benefits of greater power and storage ability. Ofcourse it might not be as responsive as edge devices
+Things to think about
+Thanks for your response! Being able to explain some of these topics to an end user can help you shape some of their expectations, as well as potentially find an even better fit for their use case.
+
+
+## In this lesson we covered:
+
+Basics of OpenCV
+Handling Input Streams in OpenCV
+Processing Model Outputs for Additional Useful Information
+The Basics of MQTT and their use with IoT devices
+Sending statistics and video streams to a server
+Performance basics
+Thinking about additional model use cases, as well as end user needs
+
+## Lesson GLossary
+
+****OpenCV
+A computer vision (CV) library filled with many different computer vision functions and other useful image and video processing and handling capabilities.
+
+MQTT
+A publisher-subscriber protocol often used for IoT devices due to its lightweight nature. The paho-mqtt library is a common way of working with MQTT in Python.
+
+Publish-Subscribe Architecture
+A messaging architecture whereby it is made up of publishers, that send messages to some central broker, without knowing of the subscribers themselves. These messages can be posted on some given “topic”, which the subscribers can then listen to without having to know the publisher itself, just the “topic”.
+
+Publisher
+In a publish-subscribe architecture, the entity that is sending data to a broker on a certain “topic”.
+
+Subscriber
+In a publish-subscribe architecture, the entity that is listening to data on a certain “topic” from a broker.
+
+Topic
+In a publish-subscribe architecture, data is published to a given topic, and subscribers to that topic can then receive that data.
+
+FFmpeg
+Software that can help convert or stream audio and video. In the course, the related ffserver software is used to stream to a web server, which can then be queried by a Node server for viewing in a web browser.
+
+Flask
+A Python framework useful for web development and another potential option for video streaming to a web browser.
+
+Node Server
+A web server built with Node.js that can handle HTTP requests and/or serve up a webpage for viewing in a browser.
+
+You’ve accomplished something amazing! You went from the basics of AI at the Edge, built your skills with pre-trained models, the Model Optimizer, Inference Engine and more with the Intel® Distribution of OpenVINO™ Toolkit, and even learned more about deploying an app at the edge. Best of luck on the project, and I look forward to seeing what you build next!
+
+Intel® DevMesh
+Check out the [Intel® DevMesh](https://devmesh.intel.com/) website for some more awesome projects others have built, join in on existing projects, or even post some of your own!
+
+Continuing with the Toolkit
+If you want to learn more about OpenVINO, you can download the toolkit [here](https://software.intel.com/en-us/openvino-toolkit/choose-download?)
+
+
+### end of course ###
